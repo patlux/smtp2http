@@ -1,6 +1,5 @@
 use lettre::message::header::ContentType;
 use lettre::{Message, SmtpTransport, Transport};
-// use mail_send::{mail_builder::MessageBuilder, SmtpClientBuilder};
 use mailin_embedded::{response::OK, Handler, Server, SslConfig};
 use structopt::StructOpt;
 use tracing::info;

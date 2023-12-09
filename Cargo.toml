@@ -6,7 +6,6 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.75"
 lettre = "0.11.2"
-mail-send = "0.4.3"
 mailin = "0.6.3"
 mailin-embedded = "0.8.1"
 structopt = "0.3.26"
