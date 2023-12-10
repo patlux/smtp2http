@@ -8,6 +8,8 @@ anyhow = "1.0.75"
 lettre = "0.11.2"
 mailin = "0.6.3"
 mailin-embedded = "0.8.1"
+reqwest = { version = "0.11.22", features = ["json", "blocking"] }
+serde_json = "1.0.108"
 structopt = "0.3.26"
 tokio = { version = "1.35.0", features = ["full"] }
 tracing = "0.1.40"
