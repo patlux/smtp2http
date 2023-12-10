@@ -1,5 +1,5 @@
 use lettre::message::header::ContentType;
-use lettre::{Message, SmtpTransport, Transport};
+use lettre::{Message, SmtpTransport, Transport as _};
 use mailin_embedded::{response::OK, Handler, Server, SslConfig};
 use structopt::StructOpt;
 use tracing::info;
@@ -14,7 +14,7 @@ enum Commands {
         #[structopt(default_value = "http://localhost:1337")]
         endpoint: String,
     },
-    Send {
+    SendTestMail {
         #[structopt(default_value = "smtp://127.0.0.1:25")]
         url: String,
     },
@@ -33,16 +33,18 @@ impl Handler for Smtp2HttpHandler {
     }
     fn data_end(&mut self) -> mailin::Response {
         let message = String::from_utf8(self.data.to_vec()).unwrap();
+        let mail = mail_parser::MessageParser::default()
+            .parse(&message)
+            .unwrap();
+
+        let body = serde_json::to_string(&mail).unwrap();
 
         let client = reqwest::blocking::Client::new();
-        let result = client
-            .post(&self.endpoint)
-            .body(serde_json::json!({ "hello": "sir" }).to_string())
-            .send();
+        let result = client.post(&self.endpoint).body(body).send();
 
         match result {
-            Ok(_) => println!("Sent message to {}.", &self.endpoint),
-            Err(err) => println!("Sending not successful. {}", err),
+            Ok(_) => println!("Forwarded mail to {}.", &self.endpoint),
+            Err(err) => println!("Forwaring failed: {}", err),
         }
 
         OK
@@ -58,7 +60,7 @@ async fn main() -> anyhow::Result<()> {
     let opt = Commands::from_args();
 
     match opt {
-        Commands::Send { url } => {
+        Commands::SendTestMail { url } => {
             let email = Message::builder()
                 .from("NoBody <nobody@domain.tld>".parse().unwrap())
                 .reply_to("Yuin <yuin@domain.tld>".parse().unwrap())
@@ -68,32 +70,35 @@ async fn main() -> anyhow::Result<()> {
                 .body(String::from("Be happy!"))
                 .unwrap();
 
-            let mailer = SmtpTransport::from_url(&url).unwrap().build();
+            let result = SmtpTransport::from_url(&url).unwrap().build().send(&email);
 
-            match mailer.send(&email) {
+            match result {
                 Ok(_) => info!("Email sent successfully!"),
                 Err(e) => panic!("Could not send email: {e:?}"),
             }
         }
         Commands::Server { listen, endpoint } => {
-            let mut server = Server::new(Smtp2HttpHandler {
-                data: vec![],
-                endpoint,
-            });
-
-            server
-                .with_name("localhost")
-                .with_ssl(SslConfig::None)
-                .unwrap()
-                .with_addr(listen)
-                .unwrap();
-
-            info!("Start server ...");
-            server.serve().unwrap();
-
-            info!("Server closed.");
+            info!(r#"Forwards mails to "{}"."#, &endpoint);
+            start_smtp2http(listen, endpoint);
+            info!("SMTP server closed.");
         }
     }
 
     Ok(())
+}
+
+fn start_smtp2http(listen: String, endpoint: String) {
+    let mut server = Server::new(Smtp2HttpHandler {
+        data: vec![],
+        endpoint: endpoint.clone(),
+    });
+
+    server
+        .with_name("localhost")
+        .with_ssl(SslConfig::None)
+        .unwrap()
+        .with_addr(listen)
+        .expect("Faild to start SMTP server");
+
+    server.serve().unwrap();
 }
