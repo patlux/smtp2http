@@ -8,14 +8,14 @@ use tracing::info;
 #[structopt()]
 enum Commands {
     Server {
-        #[structopt(default_value = "127.0.0.1:25")]
+        #[structopt(env = "LISTEN", default_value = "127.0.0.1:25")]
         listen: String,
 
-        #[structopt(default_value = "http://localhost:1337")]
+        #[structopt(env = "REST_ENDPOINT", default_value = "http://localhost:1337")]
         endpoint: String,
     },
     SendTestMail {
-        #[structopt(default_value = "smtp://127.0.0.1:25")]
+        #[structopt(env = "URL", default_value = "smtp://127.0.0.1:25")]
         url: String,
     },
 }
@@ -44,7 +44,7 @@ impl Handler for Smtp2HttpHandler {
 
         match result {
             Ok(_) => println!("Forwarded mail to {}.", &self.endpoint),
-            Err(err) => println!("Forwaring failed: {}", err),
+            Err(err) => println!("Forwarding failed: {}", err),
         }
 
         OK
@@ -79,7 +79,7 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::Server { listen, endpoint } => {
             info!(r#"Forwards mails to "{}"."#, &endpoint);
-            start_smtp2http(listen, endpoint);
+            start_smtp2http(&listen, &endpoint).expect("Failed to start smtp server.");
             info!("SMTP server closed.");
         }
     }
@@ -87,10 +87,10 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn start_smtp2http(listen: String, endpoint: String) {
+fn start_smtp2http(listen: &str, endpoint: &str) -> Result<(), mailin_embedded::err::Error> {
     let mut server = Server::new(Smtp2HttpHandler {
         data: vec![],
-        endpoint: endpoint.clone(),
+        endpoint: endpoint.to_owned(),
     });
 
     server
@@ -100,5 +100,73 @@ fn start_smtp2http(listen: String, endpoint: String) {
         .with_addr(listen)
         .expect("Faild to start SMTP server");
 
-    server.serve().unwrap();
+    server.serve()
+}
+
+#[cfg(test)]
+mod tests {
+    use core::time;
+    use std::thread;
+    use warp::Filter;
+
+    use lettre::message::header::ContentType;
+    use lettre::{Message, SmtpTransport, Transport as _};
+
+    use crate::start_smtp2http;
+
+    #[tokio::test]
+    async fn should_forward_mail() -> anyhow::Result<()> {
+        println!("Start...");
+        let smtp_listen = String::from("127.0.0.1:1440");
+        let rest_endpoint = String::from("http://127.0.0.1:1441");
+
+        thread::spawn(|| {
+            println!("Thread::Start");
+            let smtp_listen = String::from("127.0.0.1:1440");
+            let rest_endpoint = String::from("http://127.0.0.1:1441");
+
+            println!("Thread::ServerStart");
+            start_smtp2http(&smtp_listen, &rest_endpoint).expect("Failed to start smtp server.");
+            println!("Thread::End");
+        });
+
+        while !port_check::is_port_reachable_with_timeout(
+            &smtp_listen,
+            time::Duration::from_millis(1000),
+        ) {
+            thread::sleep(time::Duration::from_millis(500));
+        }
+        println!("Server is now reachable.");
+
+        // assert_eq!(
+        //     port_check::is_port_reachable("127.0.0.1:1440"),
+        //     true,
+        //     "Port should be reachable."
+        // );
+
+        let hello = warp::post().and(warp::path("")).and(warp::path::end());
+        warp::serve(hello).run(([127, 0, 0, 1], 1441)).await;
+
+        let email = Message::builder()
+            .from("NoBody <nobody@domain.tld>".parse().unwrap())
+            .reply_to("Yuin <yuin@domain.tld>".parse().unwrap())
+            .to("Hei <hei@domain.tld>".parse().unwrap())
+            .subject("Happy new year")
+            .header(ContentType::TEXT_PLAIN)
+            .body(String::from("Be happy!"))
+            .unwrap();
+
+        SmtpTransport::from_url("smtp://127.0.0.1:1440")
+            .unwrap()
+            .build()
+            .send(&email)
+            .expect("Mail sent failed");
+
+        println!("Before Sleep");
+        thread::sleep(time::Duration::from_millis(5000));
+
+        println!("After Sleep");
+
+        Ok(())
+    }
 }
