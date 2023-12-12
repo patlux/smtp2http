@@ -26,6 +26,13 @@ struct Smtp2HttpHandler {
     pub endpoint: String,
 }
 
+#[derive(serde::Serialize)]
+struct Smtp2HttpData {
+    subject: String,
+    html: String,
+    text: String,
+}
+
 impl Handler for Smtp2HttpHandler {
     fn data(&mut self, buf: &[u8]) -> std::io::Result<()> {
         self.data.extend_from_slice(buf);
@@ -37,7 +44,15 @@ impl Handler for Smtp2HttpHandler {
             .parse(&message)
             .unwrap();
 
-        let body = serde_json::to_string(&mail).unwrap();
+        let data = Smtp2HttpData {
+            subject: mail.subject().unwrap().into(),
+            html: mail.body_html(0).unwrap().into(),
+            text: mail.body_text(0).unwrap().into(),
+        };
+
+        let body = serde_json::to_string(&data).unwrap();
+
+        info!("{}", body);
 
         let client = reqwest::blocking::Client::new();
         let result = client.post(&self.endpoint).body(body).send();
