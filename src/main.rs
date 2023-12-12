@@ -2,7 +2,7 @@ use lettre::message::header::ContentType;
 use lettre::{Message, SmtpTransport, Transport as _};
 use mailin_embedded::{response::OK, Handler, Server, SslConfig};
 use structopt::StructOpt;
-use tracing::info;
+use tracing::{error, info};
 
 #[derive(StructOpt)]
 #[structopt()]
@@ -43,8 +43,8 @@ impl Handler for Smtp2HttpHandler {
         let result = client.post(&self.endpoint).body(body).send();
 
         match result {
-            Ok(_) => println!("Forwarded mail to {}.", &self.endpoint),
-            Err(err) => println!("Forwaring failed: {}", err),
+            Ok(_) => info!("Forwarded mail to {}.", &self.endpoint),
+            Err(err) => error!("Forwaring failed: {}", err),
         }
 
         OK
