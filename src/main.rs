@@ -79,7 +79,7 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::Server { listen, endpoint } => {
             info!(r#"Forwards mails to "{}"."#, &endpoint);
-            start_smtp2http(listen, endpoint);
+            start_smtp2http(listen, endpoint).expect("Failed to start smtp server");
             info!("SMTP server closed.");
         }
     }
@@ -87,7 +87,7 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn start_smtp2http(listen: String, endpoint: String) {
+fn start_smtp2http(listen: String, endpoint: String) -> Result<(), mailin_embedded::err::Error> {
     let mut server = Server::new(Smtp2HttpHandler {
         data: vec![],
         endpoint: endpoint.clone(),
@@ -97,8 +97,7 @@ fn start_smtp2http(listen: String, endpoint: String) {
         .with_name("localhost")
         .with_ssl(SslConfig::None)
         .unwrap()
-        .with_addr(listen)
-        .expect("Faild to start SMTP server");
+        .with_addr(listen)?;
 
-    server.serve().unwrap();
+    server.serve()
 }
