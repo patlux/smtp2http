@@ -17,13 +17,20 @@ jobs:
           - os_name: Linux-aarch64
             os: ubuntu-20.04
             target: aarch64-unknown-linux-musl
-            bin: precious
-            name: precious-Linux-aarch64-musl.tar.gz
+            bin: smtp2http
+            name: smtp2http-Linux-aarch64-musl.tar.gz
+            command: build
+            customCommand: apt install libssl-dev
 
     runs-on: ${{ matrix.platform.os }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+      - name: Cache cargo & target directories
+        uses: Swatinem/rust-cache@v2
+      - name: Run custom command
+        run: ${{ matrix.platform.customCommand }}
+        if: matrix.platform.customCommand
       - name: Build binary
         uses: houseabsolute/actions-rust-cross@v0
         with:
