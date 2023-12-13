@@ -2,7 +2,7 @@ use lettre::message::header::ContentType;
 use lettre::{Message, SmtpTransport, Transport as _};
 use mailin_embedded::{response::OK, Handler, Server, SslConfig};
 use structopt::StructOpt;
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 #[derive(StructOpt)]
 #[structopt()]
@@ -52,7 +52,7 @@ impl Handler for Smtp2HttpHandler {
 
         let body = serde_json::to_string(&data).unwrap();
 
-        info!("{}", body);
+        debug!("{}", body);
 
         let client = reqwest::blocking::Client::new();
         let result = client.post(&self.endpoint).body(body).send();
