@@ -14,11 +14,11 @@ jobs:
     strategy:
       matrix:
         platform:
-          - os_name: macOS-aarch64
-            os: macOS-latest
-            target: aarch64-apple-darwin
+          - os_name: Linux-aarch64
+            os: ubuntu-20.04
+            target: aarch64-unknown-linux-musl
             bin: precious
-            name: precious-Darwin-aarch64.tar.gz
+            name: precious-Linux-aarch64-musl.tar.gz
 
     runs-on: ${{ matrix.platform.os }}
     steps:
